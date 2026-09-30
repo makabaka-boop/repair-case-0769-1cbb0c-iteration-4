@@ -1,5 +1,5 @@
 import{beforeEach,describe,expect,it}from'vitest';
-import{buildRelationReport}from'./relation';
+import{buildRelationReport,groupableSiteGroups}from'./relation';
 import{NEAR_KEY,buildConclusion,loadConclusions,reconcileConclusions,saveConclusions}from'./near';
 import{Specimen}from'./types';
 
@@ -93,6 +93,35 @@ describe('最短路径并列：按内部记录 ID 序列取唯一结果',()=>{
     const rs=rows(['p','q','s','t','u']);
     const r=buildRelationReport([dup(rs,'s','u'),dup(rs,'u','q'),dup(rs,'u','p'),dup(rs,'q','t'),dup(rs,'p','t'),sep(rs,'s','t')]);
     expect(r.conflicts[0].path).toEqual(['s','u','p','t']); // p < q
+  });
+});
+
+describe('同点分组排版可用组：仅当前有效且无矛盾',()=>{
+  it('无冲突时全部同点组可用，组索引与关系检查一致',()=>{
+    const rs=rows(['a','b','c','x','y']);
+    const report=buildRelationReport([dup(rs,'a','b'),dup(rs,'b','c'),dup(rs,'x','y')]);
+    expect(groupableSiteGroups(report).map(g=>[g.index,g.memberIds])).toEqual([
+      [1,['a','b','c']],[2,['x','y']],
+    ]);
+  });
+  it('卷入冲突的同点组整体排除，不相干的无矛盾组保留',()=>{
+    // a-b-c 同点链且 a、c 被判两份 → 整组不可用于排版；x-y 无矛盾仍可用
+    const rs=rows(['a','b','c','x','y']);
+    const report=buildRelationReport([dup(rs,'a','b'),dup(rs,'b','c'),sep(rs,'a','c'),dup(rs,'x','y')]);
+    expect(groupableSiteGroups(report).map(g=>g.memberIds)).toEqual([['x','y']]);
+  });
+  it('相异关系两端分属不同组不构成冲突时，两个同点组都保留',()=>{
+    const rs=rows(['a','b','c','d','e']);
+    const report=buildRelationReport([dup(rs,'a','b'),dup(rs,'c','d'),sep(rs,'a','c'),sep(rs,'a','e')]);
+    expect(report.conflicts).toEqual([]);
+    expect(groupableSiteGroups(report).map(g=>g.memberIds)).toEqual([['a','b'],['c','d']]);
+  });
+  it('没有同点结论时没有可用组，且函数为纯只读不改变报告',()=>{
+    const rs=rows(['a','b']);
+    const report=buildRelationReport([sep(rs,'a','b')]);
+    const snapshot=JSON.stringify(report);
+    expect(groupableSiteGroups(report)).toEqual([]);
+    expect(JSON.stringify(report)).toBe(snapshot);
   });
 });
 

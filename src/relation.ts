@@ -76,3 +76,13 @@ export function buildRelationReport(entries:NearConclusion[]):RelationReport{
   for(const c of conflicts)for(const id of c.path)involved.add(id);
   return{conclusions:entries.length,groups,conflicts,involved};
 }
+
+/**
+ * 可用于“同点分组排版”的采集点组：只取当前仍有效、且不卷入任何冲突的同点复采分组。
+ * - 仅依据调用方传入的（已核对仍有效的）结论，未复核的对与“确为两份”都不产生合并；
+ * - 整组任一成员卷入冲突，该组整体排除——冲突只警示，绝不据此合并或更改人工复核结论；
+ * - 组索引沿用关系检查中的分组号（按组内最小内部 ID 排序），同一计算结果、确定不变。
+ */
+export function groupableSiteGroups(report:RelationReport):RelationGroup[]{
+  return report.groups.filter(g=>!g.memberIds.some(id=>report.involved.has(id)));
+}
